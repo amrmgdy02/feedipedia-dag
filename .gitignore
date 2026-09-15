@@ -1,0 +1,53 @@
+# ============================================================
+# Feedipedia ETL — Git ignore rules
+# ============================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.ipynb_checkpoints/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Secrets / environment files ---
+.env
+.env.*
+!.env.example
+
+# --- Airflow runtime ---
+logs/
+airflow.cfg
+config/airflow.cfg
+airflow.db
+airflow-webserver.pid
+unittests.cfg
+*.pid
+
+# --- Generated ETL data ---
+# SQLite database produced by the load step
+data/feedipedia.db
+# API raw pages (timestamped per run) and transformed staging NDJSON
+data/raw/
+data/staging/
+
+# --- Large / one-off data exports (not source code) ---
+Feedipedia_BigQuery_Full_Export*.xlsx
+*.xlsx.tmp
+
+# --- Editors / OS ---
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
