@@ -40,7 +40,7 @@ ENV = "review"
 #############################
 
 AIRFLOW_DAGS = os.environ["DAGS_FOLDER"]
-CONFIGFILE = f"{AIRFLOW_DAGS}/feedipedia_etl/env_config.json"
+CONFIGFILE = f"{AIRFLOW_DAGS}/fao_feedipedia/config/config.json"
 with open(CONFIGFILE, "r") as jf:
     conf_data = json.load(jf)
 
@@ -52,10 +52,10 @@ os.environ["BQ_LOCATION"] = config["bq_location"]
 os.environ["FEEDIPEDIA_GCS_BUCKET"] = config["bucket"]
 os.environ["FEEDIPEDIA_API_URL"] = config["api_url"]
 
-from feedipedia_etl.extract import EXTRACT_RESOURCES
-from feedipedia_etl import gcp_clients
-from feedipedia_etl.load import load_bigquery_tables
-from feedipedia_etl.transform import transform_all  
+from fao_feedipedia.utils.extract import EXTRACT_RESOURCES
+from fao_feedipedia.utils import gcp_clients
+from fao_feedipedia.utils.load import load_bigquery_tables
+from fao_feedipedia.utils.transform import transform_all  
 
 
 

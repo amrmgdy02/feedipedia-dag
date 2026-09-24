@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict, List, Tuple
 
-from feedipedia_etl.utils import (
+from .utils import (
     REGION_COUNTRIES,
     extract_lexical_plain_text,
     to_float,
