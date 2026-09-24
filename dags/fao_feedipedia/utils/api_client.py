@@ -98,6 +98,38 @@ def iter_pages(
             time.sleep(delay_seconds)
 
 
+def probe_collection(resource: str) -> dict:
+    """Cheaply fingerprint one collection without downloading it.
+
+    Asks for a single document sorted newest-first, which yields the collection's
+    latest ``updatedAt`` and its total document count in one request. Together
+    those detect every kind of change: an insert or edit moves ``updated_at``, a
+    delete moves ``total_docs``, and a delete-plus-insert in the same window still
+    moves ``updated_at``.
+
+    Note ``updatedAt`` is CMS *write* time, not editorial time — fine for change
+    detection, but never show it to users as "last updated".
+    """
+    session = _session()
+    resp = session.get(
+        f"{API_BASE_URL}/{resource}",
+        params={"limit": 1, "sort": "-updatedAt"},
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    docs = body.get("docs") or []
+    return {
+        "total_docs": body.get("totalDocs"),
+        "updated_at": docs[0].get("updatedAt") if docs else None,
+    }
+
+
+def source_fingerprint(resources) -> dict[str, dict]:
+    """Fingerprint every collection: ``{resource: {total_docs, updated_at}}``."""
+    return {resource: probe_collection(resource) for resource in resources}
+
+
 def fetch_collection(
     resource: str,
     page_size: int = API_PAGE_SIZE,

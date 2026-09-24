@@ -16,14 +16,6 @@ def prefix_for(resource: str, run_id: str) -> str:
 
 
 def _clear_prefix(bucket, prefix: str) -> int:
-    """Delete any pages already staged under ``prefix`` and return how many.
-
-    A rerun of the same ``run_id`` that yields fewer pages than the previous
-    attempt would otherwise leave the surplus ``page-NNNNNN.ndjson`` objects
-    behind, and the transform — which reads everything under the prefix — would
-    ingest both attempts and emit duplicate rows. The prefix belongs to this run
-    and is about to be rewritten, so clearing it first is the safe order.
-    """
     stale = list(bucket.list_blobs(prefix=f"{prefix}/"))
     if not stale:
         return 0
