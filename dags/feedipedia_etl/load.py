@@ -1,175 +1,119 @@
 from __future__ import annotations
 
-import argparse
+import io
 import json
 import logging
-import sqlite3
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
 
-from .config import ALL_TABLES, LOCAL_DATA_DIR, SQLITE_DB_PATH
-from .sqlite_schemas import SQLITE_SCHEMAS, get_column_names
+from google.api_core.exceptions import NotFound
+from google.cloud import bigquery
+
+from .config import (
+    BQ_DATASET,
+    BQ_GCS_WRITE_DISPOSITION,
+    BQ_LOCATION,
+    BQ_PROJECT,
+)
+from .gcp_clients import bigquery_client
+from .schemas import SCHEMAS
 
 log = logging.getLogger(__name__)
 
 
-def _scalar(value: Any) -> Any:
-    if value is None or isinstance(value, (int, float, str, bytes)):
-        return value
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, (datetime, timezone)):
-        return value.isoformat()
-    return json.dumps(value, ensure_ascii=False)
-
-
-def _read_rows(path: Path) -> tuple[list[dict], list[str]]:
-    rows: list[dict] = []
-    with open(path, "r", encoding="utf-8") as fh:
-        for line in fh:
-            if line.strip():
-                rows.append(json.loads(line))
-
-    if not rows:
-        cols = get_column_names(path.stem)
-        return rows, cols
-
-    cols = get_column_names(path.stem)
-    
-    seen = set(cols)
-    for r in rows:
-        for key in r.keys():
-            if key not in seen:
-                seen.add(key)
-                cols.append(key)
-    
-    return rows, cols
-
-
-def _create_table(conn: sqlite3.Connection, table: str, cols: list[str]) -> None:
-    schema = SQLITE_SCHEMAS.get(table, {})
-    schema_cols = {name: type_ for name, type_ in schema}
-    
-    col_defs = []
-    for c in cols:
-        if c in schema_cols:
-            col_defs.append(f'"{c}" {schema_cols[c]}')
-        else:
-            # Extra column not in schema; use TEXT
-            col_defs.append(f'"{c}" TEXT')
-    
-    if not col_defs:
-        raise ValueError(f"No columns for table {table!r}")
-    
-    ddl = f'CREATE TABLE "{table}" ({", ".join(col_defs)})'
-    conn.execute(f'DROP TABLE IF EXISTS "{table}"')
-    conn.execute(ddl)
-    conn.commit()
-
-
-def load_ndjson_table(db_path: str | Path, table: str, ndjson_path: str | Path,
-                      drop_first: bool = True) -> int:
-    ndjson_path = Path(ndjson_path)
-    if not ndjson_path.exists():
-        raise FileNotFoundError(f"Staging NDJSON not found: {ndjson_path}")
-
-    rows, cols = _read_rows(ndjson_path)
-    if not rows:
-        log.info("%s: no rows to load (empty file)", table)
-        return 0
-
-    db_path = Path(db_path)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
-    
-    if drop_first:
-        _create_table(conn, table, cols)
-
-    placeholders = ", ".join("?" for _ in cols)
-    quoted = ", ".join(f'"{c}"' for c in cols)
-    insert_sql = f'INSERT INTO "{table}" ({quoted}) VALUES ({placeholders})'
-
-    data = [[_scalar(row.get(c)) for c in cols] for row in rows]
-    conn.executemany(insert_sql, data)
-    conn.commit()
-    conn.close()
-    
-    log.info("Loaded %d rows into %s from %s", len(data), table, ndjson_path)
-    return len(data)
-
-
-def load_staging_dir(db_path: str | Path, staging_dir: str | Path,
-                     table_names: list[str] | None = None) -> dict[str, int]:
-    staging_dir = Path(staging_dir)
-    if not staging_dir.is_dir():
-        raise NotADirectoryError(f"Staging directory not found: {staging_dir}")
-
-    ndjson_files = sorted(staging_dir.glob("*.ndjson"))
-    if table_names is not None:
-        wanted = set(table_names)
-        ndjson_files = [p for p in ndjson_files if p.stem in wanted]
-
-    if not ndjson_files:
-        log.warning("No NDJSON files in %s", staging_dir)
-        return {}
-
-    db_path = Path(db_path)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
-    loaded: dict[str, int] = {}
-    
+def _ensure_table(client: bigquery.Client, table_name: str) -> bigquery.TableReference:
+    """Return the table ref, creating the table from its schema if missing."""
+    if table_name not in SCHEMAS:
+        raise ValueError(f"No BigQuery schema defined for table {table_name!r}")
+    table_ref = client.dataset(BQ_DATASET, project=BQ_PROJECT).table(table_name)
     try:
-        for path in ndjson_files:
-            table = path.stem
-            rows, cols = _read_rows(path)
-            if not rows:
-                log.info("%s: skipped (empty file)", table)
-                continue
-            
-            _create_table(conn, table, cols)
-            quoted_cols = ", ".join(f'"{c}"' for c in cols)
-            placeholders = ", ".join("?" for _ in cols)
-            insert = f'INSERT INTO "{table}" ({quoted_cols}) VALUES ({placeholders})'
-            
-            data = [[_scalar(row.get(c)) for c in cols] for row in rows]
-            conn.executemany(insert, data)
-            conn.commit()
-            loaded[table] = len(data)
-            log.info("Loaded %d rows into %s", len(data), table)
-    finally:
-        conn.close()
-    
-    return loaded
+        client.get_table(table_ref)
+    except NotFound:
+        table = bigquery.Table(table_ref, schema=SCHEMAS[table_name])
+        client.create_table(table)
+        log.info("Created BigQuery table %s", table_name)
+    return table_ref
 
 
-def _run_id(context: dict) -> str:
-    """Logical execution date."""
-    ts = context.get("ts_nodash")
-    if ts:
-        return str(ts)
-    ts = context.get("ts")
-    if ts:
-        return str(ts).replace("-", "").replace(":", "").replace(" ", "").split(".")[0]
-    fallback = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-    log.warning("No Airflow ts_nodash in context, using wall clock '%s'", fallback)
-    return fallback
+def _rows_to_ndjson(rows: list[dict]) -> bytes:
+    """Serialize rows to an in-memory NDJSON blob for a BigQuery load job."""
+    return "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows).encode("utf-8")
 
 
-def load_sqlite_tables(table_names: list[str], **context) -> dict[str, int]:
-    """Airflow task: load staging NDJSON into SQLite."""
-    ti = context["ti"]
-    run_id = _run_id(context)
-    db_path = context.get("db_path") or SQLITE_DB_PATH
-    staging_dir = context.get("staging_dir") or Path(LOCAL_DATA_DIR) / "staging" / run_id
+def _check_not_empty(
+    tables: dict[str, list[dict]],
+    write_disposition: str,
+    allow_empty: frozenset[str] | set[str],
+) -> None:
+    """Refuse to truncate a table down to nothing.
+    Empty tables are checked for the whole batch 
+    up front so the run fails before any load job has truncated anything.
 
-    counts = load_staging_dir(
-        db_path=db_path,
-        staging_dir=staging_dir,
-        table_names=list(table_names),
+    Raises:
+        RuntimeError: If any table would be truncated to zero rows.
+    """
+    if write_disposition != "WRITE_TRUNCATE":
+        return
+
+    empty = sorted(
+        name
+        for name, rows in tables.items()
+        if name in SCHEMAS and not rows and name not in allow_empty
     )
-    missing = [t for t in table_names if t not in counts]
-    if missing:
-        log.warning("No staging NDJSON found for tables (skipped): %s",
-                    ", ".join(missing))
+    if empty:
+        raise RuntimeError(
+            "Refusing to load: "
+            + ", ".join(empty)
+            + f" produced 0 rows, and {write_disposition} would replace the "
+            "existing BigQuery data with an empty table. Investigate upstream, "
+            "or pass allow_empty={...} if a table is legitimately empty."
+        )
+
+
+def load_bigquery_tables(
+    tables: dict[str, list[dict]],
+    write_disposition: str = BQ_GCS_WRITE_DISPOSITION,
+    allow_empty: frozenset[str] | set[str] = frozenset(),
+) -> dict[str, int]:
+    """Load each table's rows straight into BigQuery (full refresh).
+
+    Args:
+        tables: Mapping ``table name -> list of rows`` produced by the transform
+            step. There is no staging buffer — rows are loaded from memory.
+        write_disposition: BigQuery write disposition (default ``WRITE_TRUNCATE``).
+        allow_empty: Table names permitted to load zero rows under
+            ``WRITE_TRUNCATE``. Any other empty table fails the run.
+
+    Returns:
+        ``table name -> rows loaded``. Tables without a defined schema are
+        skipped with a warning.
+
+    Raises:
+        RuntimeError: If a table would be truncated to zero rows.
+    """
+    client = bigquery_client()
+    counts: dict[str, int] = {}
+
+    _check_not_empty(tables, write_disposition, allow_empty)
+
+    for table_name, rows in tables.items():
+        if table_name not in SCHEMAS:
+            log.warning("No BigQuery schema for table %s (skipped)", table_name)
+            continue
+
+        table_ref = _ensure_table(client, table_name)
+        job_config = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+            schema=SCHEMAS[table_name],
+            write_disposition=write_disposition,
+        )
+        job = client.load_table_from_file(
+            io.BytesIO(_rows_to_ndjson(rows)),
+            table_ref,
+            job_config=job_config,
+            location=BQ_LOCATION,
+        )
+        job.result()  # block until the load completes (raises on failure)
+
+        counts[table_name] = job.output_rows
+        log.info("Loaded %d rows into %s", job.output_rows, table_name)
+
     return counts

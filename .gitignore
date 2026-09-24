@@ -40,6 +40,15 @@ data/staging/
 # --- Large / one-off data exports (not source code) ---
 Feedipedia_BigQuery_Full_Export*.xlsx
 *.xlsx.tmp
+# Office lock files (~$Book.xlsx) — the pattern above misses them because the
+# filename starts with the ~$ prefix.
+~$*
+# Source for the REGION_COUNTRIES dict in utils.py; not read at runtime.
+dags/feedipedia_etl/region_countries_master.csv
+
+# --- Scratch, not part of this project ---
+# DIEM/ArcGIS DAG that happens to sit in this working directory.
+a.py
 
 # --- Editors / OS ---
 .idea/

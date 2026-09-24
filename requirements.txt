@@ -1,0 +1,4 @@
+# Runtime deps for the standalone Feedipedia ETL (Cloud Run job image).
+requests>=2.28
+google-cloud-storage>=2.16
+google-cloud-bigquery>=3.24

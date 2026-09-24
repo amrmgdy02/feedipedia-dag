@@ -1,9 +1,14 @@
 """Configuration for the Feedipedia ETL pipeline."""
 
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
-# --- Feedipedia API ---
+
+def make_run_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+
+
 API_BASE_URL = os.getenv(
     "FEEDIPEDIA_API_URL",
     "https://fao-feedipedia-691573242238.europe-west1.run.app/api",
@@ -13,15 +18,15 @@ API_PAGE_SIZE = 100
 REQUEST_TIMEOUT_SECONDS = 120
 MAX_PAGES = 200
 
-GCS_BUCKET_ENV = os.getenv("FEEDIPEDIA_GCS_BUCKET", "")
+PROJECT_ID = os.getenv("GCP_PROJECT", "fao-dwh-review")
 
-# --- BigQuery ---
-BQ_PROJECT = os.getenv("GCP_PROJECT", "fao-feedipedia")
+BQ_PROJECT = os.getenv("GCP_PROJECT", "fao-dwh-review")
 BQ_DATASET = os.getenv("BQ_DATASET", "feedipedia")
-BQ_LOCATION = os.getenv("BQ_LOCATION", "EU")
+BQ_LOCATION = os.getenv("BQ_LOCATION", "europe-west1")
 BQ_GCS_WRITE_DISPOSITION = "WRITE_TRUNCATE"
 
-# --- Tables loaded by this pipeline (and their load order / group) ---
+GCS_BUCKET = os.getenv("FEEDIPEDIA_GCS_BUCKET", "fao-dwh-review-feedipedia-etl")
+
 DIMENSION_TABLES = [
     "dim_parameter_class",
     "dim_category",
@@ -31,7 +36,7 @@ DIMENSION_TABLES = [
     "dim_parameter",
 ]
 ENTITY_TABLES = [
-    "dim_dataset",
+    #"dim_dataset",
     "dim_taxon",
     "dim_datasheet",
     "dim_feed",
@@ -45,23 +50,3 @@ FACT_TABLES = [
     "fct_datasheet_geo",
 ]
 ALL_TABLES = DIMENSION_TABLES + ENTITY_TABLES + FACT_TABLES
-
-SEEDS_DIR = Path(__file__).resolve().parent / "seeds"
-SEED_FILES = {
-    "countries": "countries.json",
-    "parameters": "parameters.json",
-    "parameter_classes": "parameter_classes.json",
-    "licenses": "licenses.json",
-    "region_map": "region_map.json",
-}
-
-DAG_SCHEDULE = os.getenv("FEEDIPEDIA_DAG_SCHEDULE", "0 6 * * 0")
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-LOCAL_DATA_DIR = Path(
-    os.getenv("FEEDIPEDIA_LOCAL_DATA_DIR", str(PROJECT_ROOT / "data"))
-)
-
-SQLITE_DB_PATH = Path(
-    os.getenv("FEEDIPEDIA_SQLITE_DB", str(LOCAL_DATA_DIR / "feedipedia.db"))
-)

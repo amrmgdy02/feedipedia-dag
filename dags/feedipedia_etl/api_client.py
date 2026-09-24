@@ -15,7 +15,7 @@ from .config import (
     REQUEST_TIMEOUT_SECONDS,
 )
 
-log = logging.getLogger("airflow.task")
+log = logging.getLogger(__name__)
 
 
 def iter_pages(
@@ -41,8 +41,8 @@ def iter_pages(
     session = requests.Session()
 
     while True:
-        params = {"page": page}
-        if depth and resource in ("datasheets"):
+        params = {"page": page, "limit": page_size}
+        if depth and resource in ["datasheets", "feeds"]:
             params["depth"] = depth
 
         resp = session.get(
@@ -61,8 +61,14 @@ def iter_pages(
         docs = body["docs"] or []
         yield page, docs
 
-        if not body.get("hasNextPage") or page >= max_pages:
+        if not body.get("hasNextPage"):
             break
+        if page >= max_pages:
+            raise RuntimeError(
+                f"Reached max_pages={max_pages} for {resource!r} with more pages "
+                f"remaining ({body.get('totalPages')} total) — raise MAX_PAGES "
+                f"or API_PAGE_SIZE; refusing to load a truncated collection."
+            )
 
         page += 1
         if delay_seconds:
