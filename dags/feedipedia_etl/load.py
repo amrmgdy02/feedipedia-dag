@@ -19,6 +19,23 @@ from .schemas import SCHEMAS
 log = logging.getLogger(__name__)
 
 
+def _ensure_dataset(client: bigquery.Client) -> None:
+    """Create the target dataset if it does not exist yet.
+
+    ``_ensure_table`` creates tables but nothing created the dataset, so a first
+    run against a fresh project failed on the first load with a confusing
+    "not found" rather than provisioning what it needs.
+    """
+    dataset_ref = bigquery.DatasetReference(BQ_PROJECT, BQ_DATASET)
+    try:
+        client.get_dataset(dataset_ref)
+    except NotFound:
+        dataset = bigquery.Dataset(dataset_ref)
+        dataset.location = BQ_LOCATION
+        client.create_dataset(dataset)
+        log.info("Created BigQuery dataset %s.%s in %s", BQ_PROJECT, BQ_DATASET, BQ_LOCATION)
+
+
 def _ensure_table(client: bigquery.Client, table_name: str) -> bigquery.TableReference:
     """Return the table ref, creating the table from its schema if missing."""
     if table_name not in SCHEMAS:
@@ -91,6 +108,8 @@ def load_bigquery_tables(
     """
     client = bigquery_client()
     counts: dict[str, int] = {}
+
+    _ensure_dataset(client)
 
     _check_not_empty(tables, write_disposition, allow_empty)
 

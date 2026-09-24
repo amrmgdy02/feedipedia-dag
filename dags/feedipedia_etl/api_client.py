@@ -6,6 +6,8 @@ import logging
 from typing import Iterator
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .config import (
     API_BASE_URL,
@@ -16,6 +18,27 @@ from .config import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _session() -> requests.Session:
+    """A session that retries transient failures instead of failing the run.
+
+    The API is itself a Cloud Run service, so a cold start or a brief 502/503 is
+    normal rather than exceptional. Retrying here costs seconds; letting it bubble
+    up costs a whole task (Airflow) or a whole job (Cloud Run) re-run.
+    ``backoff_factor`` gives 1s, 2s, 4s, 8s, 16s between attempts.
+    """
+    retry = Retry(
+        total=5,
+        backoff_factor=1,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset({"GET"}),
+        raise_on_status=False,
+    )
+    session = requests.Session()
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    session.mount("http://", HTTPAdapter(max_retries=retry))
+    return session
 
 
 def iter_pages(
@@ -38,7 +61,7 @@ def iter_pages(
         A tuple of ``(page_number, docs)`` for each page of the collection.
     """
     page = 1
-    session = requests.Session()
+    session = _session()
 
     while True:
         params = {"page": page, "limit": page_size}

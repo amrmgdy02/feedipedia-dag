@@ -16,6 +16,7 @@ from .doc_to_model import (
     transform_parameter_docs,
     transform_taxon_docs,
 )
+from .extract import prefix_for
 from .gcp_clients import storage_client
 from .schemas import SCHEMAS
 from .utils import fill_referenced_by, resolve_bridge_ref_ids
@@ -73,7 +74,7 @@ def transform_all(
 ) -> dict[str, list[dict]]:
     
     if prefixes is None:
-        prefixes = {resource: f"raw/{resource}/{run_id}" for resource in RESOURCES}
+        prefixes = {resource: prefix_for(resource, run_id) for resource in RESOURCES}
 
     family_docs = _read_dim_dir(prefixes["family"])
     dim_family = transform_family_docs(family_docs)

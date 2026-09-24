@@ -11,7 +11,7 @@ _DAGS_DIR = Path(__file__).resolve().parent
 if str(_DAGS_DIR) not in sys.path:
     sys.path.insert(0, str(_DAGS_DIR))
 
-from feedipedia_etl import extract as extract_mod
+from feedipedia_etl.extract import EXTRACT_RESOURCES
 from feedipedia_etl import load as load_mod
 from feedipedia_etl import transform as transform_mod
 from feedipedia_etl.config import GCS_BUCKET, make_run_id
@@ -19,17 +19,6 @@ from feedipedia_etl.gcp_clients import storage_client
 
 log = logging.getLogger("feedipedia_etl.main")
 
-EXTRACT_RESOURCES = {
-    "datasheets": extract_mod.extract_datasheets,
-    "feeds": extract_mod.extract_feeds,
-    "taxon": extract_mod.extract_taxon,
-    "family": extract_mod.extract_family,
-    "categories": extract_mod.extract_categories,
-    "licenses": extract_mod.extract_licenses,
-    "countries": extract_mod.extract_countries,
-    "parameter_classes": extract_mod.extract_parameter_classes,
-    "parameters": extract_mod.extract_parameters,
-}
 
 
 def _get_max_workers() -> int:
