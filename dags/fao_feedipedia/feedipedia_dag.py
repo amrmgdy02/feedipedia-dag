@@ -42,16 +42,16 @@ log = logging.getLogger(__name__)
 
 
 
-def _use_connection_credentials(
-    gcp_conn_id: str, gcp_project: str, impersonation_sa: str | None = None
-) -> None:
-    """Point the ETL's GCP clients at the identity behind ``gcp_conn_id``.
-    """
-    from airflow.providers.google.common.hooks.base_google import GoogleBaseHook
+# def _use_connection_credentials(
+#     gcp_conn_id: str, gcp_project: str, impersonation_sa: str | None = None
+# ) -> None:
+#     """Point the ETL's GCP clients at the identity behind ``gcp_conn_id``.
+#     """
+#     from airflow.providers.google.common.hooks.base_google import GoogleBaseHook
 
-    kwargs = {"impersonation_chain": impersonation_sa} if impersonation_sa else {}
-    hook = GoogleBaseHook(gcp_conn_id=gcp_conn_id, **kwargs)
-    gcp_clients.configure(credentials=hook.get_credentials(), project=gcp_project)
+#     kwargs = {"impersonation_chain": impersonation_sa} if impersonation_sa else {}
+#     hook = GoogleBaseHook(gcp_conn_id=gcp_conn_id, **kwargs)
+    #gcp_clients.configure(credentials=hook.get_credentials(), project=gcp_project)
 
 
 STATE_VARIABLE = f"feedipedia_{ENV}_source_fingerprint"
@@ -104,7 +104,7 @@ def extract_resource(
     impersonation_sa: str | None = None,
 ) -> str:
     """Stage one collection's raw pages on GCS; returns its prefix for the transform."""
-    _use_connection_credentials(gcp_conn_id, gcp_project, impersonation_sa)
+    #_use_connection_credentials(gcp_conn_id, gcp_project, impersonation_sa)
     return EXTRACT_RESOURCES[resource](run_id=run_id)
 
 
@@ -116,7 +116,7 @@ def transform_and_load(
     **context,
 ) -> dict[str, int]:
     """Read the staged pages, build the star schema and load it into BigQuery."""
-    _use_connection_credentials(gcp_conn_id, gcp_project, impersonation_sa)
+    #_use_connection_credentials(gcp_conn_id, gcp_project, impersonation_sa)
 
     ti = context["ti"]
     prefixes = {
@@ -164,7 +164,7 @@ with DAG(
         "run_id": "{{ ts_nodash }}",
         "gcp_conn_id": config["gcp_conn_id"],
         "gcp_project": config["gcp_project"],
-        #"impersonation_sa": config.get("impersonation_sa"),
+        "impersonation_sa": config.get("impersonation_sa"),
     }
 
     extract_tasks = [

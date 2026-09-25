@@ -25,7 +25,7 @@ BQ_DATASET = os.getenv("BQ_DATASET", "feedipedia")
 BQ_LOCATION = os.getenv("BQ_LOCATION", "europe-west1")
 BQ_GCS_WRITE_DISPOSITION = "WRITE_TRUNCATE"
 
-GCS_BUCKET = os.getenv("FEEDIPEDIA_GCS_BUCKET", "fao-dwh-review-feedipedia-etl")
+GCS_BUCKET = os.getenv("FEEDIPEDIA_GCS_BUCKET", "fao-dwh-review-feedipedia")
 # Top-level namespace inside the (shared) bucket, so this pipeline's raw pages
 # all sit under one prefix: gs://<bucket>/<GCS_PREFIX>/<collection>/<run_id>/
 GCS_PREFIX = os.getenv("FEEDIPEDIA_GCS_PREFIX", "fao_feedipedia")

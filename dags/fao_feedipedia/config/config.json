@@ -4,21 +4,21 @@
     "gcp_project": "fao-dwh-review",
     "bq_dataset": "feedipedia",
     "bq_location": "europe-west1",
-    "bucket": "fao-dwh-review-datalake",
+    "bucket": "fao-dwh-review-feedipedia",
     "api_url": "https://fao-feedipedia-691573242238.europe-west1.run.app/api",
     "email_list": [],
     "emails_enabled": false,
-    "impersonation_sa": ""
+    "impersonation_sa": "data-ingestion@fao-dwh-review.iam.gserviceaccount.com"
   },
   "prod": {
     "gcp_conn_id": "fao-feedipedia-conn",
     "gcp_project": "fao-dwh-prod",
     "bq_dataset": "feedipedia",
     "bq_location": "europe-west1",
-    "bucket": "fao-dwh-prod-feedipedia-etl",
+    "bucket": "fao-dwh-prod-feedipedia",
     "api_url": "https://fao-feedipedia-691573242238.europe-west1.run.app/api",
     "email_list": [],
     "emails_enabled": true,
-    "impersonation_sa": ""
+    "impersonation_sa": "data-ingestion@fao-dwh-prod.iam.gserviceaccount.com"
   }
 }
