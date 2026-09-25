@@ -1,6 +1,6 @@
 {
   "review": {
-    "gcp_conn_id": "feedipedia_etl",
+    "gcp_conn_id": "fao-feedipedia-conn",
     "gcp_project": "fao-dwh-review",
     "bq_dataset": "feedipedia",
     "bq_location": "europe-west1",
@@ -11,7 +11,7 @@
     "impersonation_sa": ""
   },
   "prod": {
-    "gcp_conn_id": "feedipedia_etl",
+    "gcp_conn_id": "fao-feedipedia-conn",
     "gcp_project": "fao-dwh-prod",
     "bq_dataset": "feedipedia",
     "bq_location": "europe-west1",

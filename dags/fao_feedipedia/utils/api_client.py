@@ -21,12 +21,7 @@ log = logging.getLogger(__name__)
 
 
 def _session() -> requests.Session:
-    """A session that retries transient failures instead of failing the run.
-
-    The API is itself a Cloud Run service, so a cold start or a brief 502/503 is
-    normal rather than exceptional. Retrying here costs seconds; letting it bubble
-    up costs a whole task (Airflow) or a whole job (Cloud Run) re-run.
-    ``backoff_factor`` gives 1s, 2s, 4s, 8s, 16s between attempts.
+    """A session that retries transient failures.
     """
     retry = Retry(
         total=5,
@@ -99,16 +94,8 @@ def iter_pages(
 
 
 def probe_collection(resource: str) -> dict:
-    """Cheaply fingerprint one collection without downloading it.
-
-    Asks for a single document sorted newest-first, which yields the collection's
-    latest ``updatedAt`` and its total document count in one request. Together
-    those detect every kind of change: an insert or edit moves ``updated_at``, a
-    delete moves ``total_docs``, and a delete-plus-insert in the same window still
-    moves ``updated_at``.
-
-    Note ``updatedAt`` is CMS *write* time, not editorial time — fine for change
-    detection, but never show it to users as "last updated".
+    """Asks for a single document sorted newest-first, which yields the collection's
+    latest ``updatedAt`` and its total document count in one request.
     """
     session = _session()
     resp = session.get(

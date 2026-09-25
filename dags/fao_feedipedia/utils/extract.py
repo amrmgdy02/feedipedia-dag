@@ -113,9 +113,6 @@ def extract_parameters(run_id: str) -> str:
     return prefix_for("parameters", run_id)
 
 
-# Single source of truth for which collections the pipeline extracts, and the
-# function that stages each one. Both the Airflow DAG and the local entrypoint
-# build their task list from this, so the two cannot drift apart.
 EXTRACT_RESOURCES = {
     "datasheets": extract_datasheets,
     "feeds": extract_feeds,

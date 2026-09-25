@@ -59,15 +59,6 @@ STATE_VARIABLE = f"feedipedia_{ENV}_source_fingerprint"
 
 def check_for_updates(**context) -> bool:
     """Skip the whole run when the source has not changed since the last load.
-
-    Fingerprints all nine collections (one request each, no GCP credentials
-    needed) and compares against the fingerprint recorded by the last *successful*
-    run. Returning False short-circuits every downstream task, so the DAG run is
-    marked skipped rather than pointlessly rewriting 63k identical rows.
-
-    The fingerprint is pushed to XCom and recorded at the end from that same
-    value, not re-probed: if the source changes midway through a run, we want the
-    *next* run to see it rather than recording a state we never actually loaded.
     """
     fingerprint = source_fingerprint(EXTRACT_RESOURCES)
     context["ti"].xcom_push(key="fingerprint", value=fingerprint)
@@ -173,14 +164,14 @@ with DAG(
         "run_id": "{{ ts_nodash }}",
         "gcp_conn_id": config["gcp_conn_id"],
         "gcp_project": config["gcp_project"],
-        "impersonation_sa": config.get("impersonation_sa"),
+        #"impersonation_sa": config.get("impersonation_sa"),
     }
 
     extract_tasks = [
         PythonOperator(
             task_id=f"extract_{resource}",
             python_callable=extract_resource,
-            #op_kwargs={"resource": resource, **common_kwargs},
+            op_kwargs={"resource": resource, **common_kwargs},
         )
         for resource in EXTRACT_RESOURCES
     ]
